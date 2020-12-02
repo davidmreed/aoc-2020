@@ -34,6 +34,14 @@ impl Password {
 
         count >= self.min && count <= self.max
     }
+
+    pub fn is_valid_part_2(&self) -> bool {
+        let first_index: usize = self.min as usize - 1;
+        let second_index: usize = self.max as usize - 1;
+
+        (self.password.chars().nth(first_index).unwrap() as char == self.letter)
+            ^ (self.password.chars().nth(second_index).unwrap() as char == self.letter)
+    }
 }
 
 fn from_file(file_name: &str) -> Vec<Password> {
@@ -43,17 +51,26 @@ fn from_file(file_name: &str) -> Vec<Password> {
     file.read_to_string(&mut content).unwrap();
     content
         .trim()
-        .split('\n')
+        .lines()
         .map(|x| Password::from_string(x.trim()))
         .collect()
 }
 
 fn main() {
-    let pw_count = from_file("input.txt")
+    let pws = from_file("input.txt");
+    let pw_count = pws
         .iter()
         .filter(|&pw| pw.is_valid())
         .collect::<Vec<&Password>>()
         .len();
 
-    println!("{} passwords are valid", pw_count);
+    println!("{} passwords are valid (Part 1)", pw_count);
+
+    let pw_count = pws
+        .iter()
+        .filter(|&pw| pw.is_valid_part_2())
+        .collect::<Vec<&Password>>()
+        .len();
+
+    println!("{} passwords are valid (Part 2)", pw_count);
 }
