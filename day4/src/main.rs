@@ -51,9 +51,9 @@ fn is_valid(passport: &HashMap<String, String>, validate_keys: bool) -> bool {
                     }
                     "hgt" => {
                         if v.ends_with("cm") {
-                            legal_number(v.trim_end_matches("cm"), 150, 193)
+                            legal_number(&v[0..v.len()-2], 150, 193)
                         } else if v.ends_with("in") {
-                            legal_number(v.trim_end_matches("in"), 59, 76)
+                            legal_number(&v[0..v.len()-2], 59, 76)
                         } else {
                             false
                         }
