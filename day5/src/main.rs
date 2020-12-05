@@ -45,26 +45,24 @@ fn translate_seat(d: &String) -> Seat {
 fn main() {
     let file = io::BufReader::new(File::open("input.txt").unwrap());
 
-    println!(
-        "Maximum Seat Id = {}",
-        file.lines()
-            .map(|s| translate_seat(&s.unwrap()).get_seat_id())
-            .max()
-            .unwrap()
-    );
-
-    let file = io::BufReader::new(File::open("input.txt").unwrap());
-    let assigned_seat_ids: HashSet<u32> = file
+    let seat_ids: HashSet<u32> = file
         .lines()
         .map(|s| translate_seat(&s.unwrap()).get_seat_id())
         .collect();
 
     println!(
+        "Maximum Seat Id = {}",
+        seat_ids.iter()
+            .max()
+            .unwrap()
+    );
+
+    println!(
         "My Seat Id = {:?}",
         (1..)
-            .filter(|id| !assigned_seat_ids.contains(&id)
-                && assigned_seat_ids.contains(&(id - 1))
-                && assigned_seat_ids.contains(&(id + 1)))
+            .filter(|id| !seat_ids.contains(&id)
+                && seat_ids.contains(&(id - 1))
+                && seat_ids.contains(&(id + 1)))
             .next()
             .unwrap()
     );
