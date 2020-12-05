@@ -18,24 +18,24 @@ fn partition_search(d: &str, lb: u32, ub: u32) -> u32 {
     let mut cur_lb = lb;
     let mut cur_ub = ub;
 
-    for c in d[0..d.len() - 1].chars() {
+    for c in d.chars().take(d.len() - 1) {
+        let delta = ((cur_ub - cur_lb) as f64 / 2.0).ceil() as u32;
         if c == 'F' || c == 'L' {
-            let delta = ((cur_ub - cur_lb) as f64 / 2.0).ceil();
-            cur_ub = cur_ub - delta as u32;
+            cur_ub -= delta;
         } else if c == 'B' || c == 'R' {
-            let delta = ((cur_ub - cur_lb) as f64 / 2.0).ceil();
-            cur_lb = cur_lb + delta as u32;
+            cur_lb += delta;
         }
     }
 
-    if d.chars().nth(d.len() - 1).unwrap() == 'L' || d.chars().nth(d.len() - 1).unwrap() == 'F' {
+    let final_char = d.chars().nth(d.len() - 1).unwrap();
+    if final_char == 'L' || final_char == 'F' {
         cur_lb
     } else {
         cur_ub
     }
 }
 
-fn translate_seat(d: &str) -> Seat {
+fn translate_seat(d: &String) -> Seat {
     Seat {
         row: partition_search(&d[0..7], 0, 127),
         col: partition_search(&d[7..], 0, 7),
@@ -48,7 +48,7 @@ fn main() {
     println!(
         "Maximum Seat Id = {}",
         file.lines()
-            .map(|s| translate_seat(s.unwrap().as_str()).get_seat_id())
+            .map(|s| translate_seat(&s.unwrap()).get_seat_id())
             .max()
             .unwrap()
     );
@@ -56,7 +56,7 @@ fn main() {
     let file = io::BufReader::new(File::open("input.txt").unwrap());
     let assigned_seat_ids: HashSet<u32> = file
         .lines()
-        .map(|s| translate_seat(s.unwrap().as_str()).get_seat_id())
+        .map(|s| translate_seat(&s.unwrap()).get_seat_id())
         .collect();
 
     println!(

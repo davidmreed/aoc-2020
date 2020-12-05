@@ -32,7 +32,7 @@ impl TobogganMap {
     }
 
     pub fn is_tree(&self, point: Point) -> bool {
-        let pos = ((point.y % self.height) * (self.width + 1) + (point.x % self.width));
+        let pos = (point.y % self.height) * (self.width + 1) + (point.x % self.width);
         if let Some(val) = self.map.get(pos) {
             *val == b'#'
         } else {
