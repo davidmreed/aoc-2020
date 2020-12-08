@@ -12,7 +12,7 @@ impl Error for OpcodeErr {}
 
 impl fmt::Display for OpcodeErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "OpcodeEr")
+        write!(f, "OpcodeErr")
     }
 }
 
