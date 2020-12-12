@@ -8,10 +8,52 @@ struct Pair {
     y: usize,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+struct Delta {
+    x: i32,
+    y: i32,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum Mode {
+    Adjacency,
+    Visibility,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 struct StateMachine {
     state: Vec<u8>,
     size: Pair,
+    mode: Mode,
+}
+
+struct VectorIterator {
+    size: Pair,
+    cur: Pair,
+    vector: Delta,
+}
+
+impl Iterator for VectorIterator {
+    type Item = Pair;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next_x = (self.cur.x as i32) + self.vector.x;
+        let next_y = (self.cur.y as i32) + self.vector.y;
+
+        if next_x < 0
+            || next_x as usize >= self.size.x
+            || next_y < 0
+            || next_y as usize >= self.size.y
+        {
+            None
+        } else {
+            self.cur = Pair {
+                x: next_x as usize,
+                y: next_y as usize,
+            };
+            Some(self.cur)
+        }
+    }
 }
 
 impl fmt::Display for StateMachine {
@@ -32,7 +74,7 @@ impl fmt::Display for StateMachine {
 }
 
 impl StateMachine {
-    fn from_vec(content: Vec<u8>) -> Result<StateMachine, Box<dyn Error>> {
+    fn from_vec(content: Vec<u8>, mode: Mode) -> Result<StateMachine, Box<dyn Error>> {
         let x = content
             .iter()
             .position(|&e| e == b'\n')
@@ -42,18 +84,19 @@ impl StateMachine {
         Ok(StateMachine {
             state: content,
             size: Pair { x, y },
+            mode,
         })
     }
-    fn from_file(file_name: &str) -> Result<StateMachine, Box<dyn Error>> {
+    fn from_file(file_name: &str, mode: Mode) -> Result<StateMachine, Box<dyn Error>> {
         let mut file = File::open(file_name)?;
         let mut content = Vec::new();
 
         file.read_to_end(&mut content)?;
-        StateMachine::from_vec(content)
+        StateMachine::from_vec(content, mode)
     }
 
-    fn from_string(content: &str) -> Result<StateMachine, Box<dyn Error>> {
-        StateMachine::from_vec(content.as_bytes().to_vec())
+    fn from_string(content: &str, mode: Mode) -> Result<StateMachine, Box<dyn Error>> {
+        StateMachine::from_vec(content.as_bytes().to_vec(), mode)
     }
 
     pub fn get_occupied_seats(&self) -> usize {
@@ -111,18 +154,69 @@ impl StateMachine {
         count
     }
 
+    fn get_vector_iterator(&self, cell: Pair, vector: Delta) -> VectorIterator {
+        VectorIterator {
+            size: self.size,
+            cur: cell,
+            vector: vector,
+        }
+    }
+
+    pub fn get_visible_count(&self, cell: Pair) -> u8 {
+        let mut count = 0;
+
+        for &x_delta in [-1, 0, 1].iter() {
+            for &y_delta in [-1, 0, 1].iter() {
+                if x_delta == 0 && y_delta == 0 {
+                    continue;
+                }
+
+                let first_seat = self
+                    .get_vector_iterator(
+                        cell,
+                        Delta {
+                            x: x_delta,
+                            y: y_delta,
+                        },
+                    )
+                    .filter(|&cell| *self.get_cell(cell).unwrap() != b'.')
+                    .next();
+
+                count +=
+                    if first_seat.is_some() && self.get_neighbor_value(first_seat.unwrap()) == 1 {
+                        1
+                    } else {
+                        0
+                    };
+            }
+        }
+
+        count
+    }
+
     pub fn next_state(&self) -> StateMachine {
         let mut next = self.clone();
+        let threshold = if let Mode::Adjacency = self.mode {
+            4
+        } else {
+            5
+        };
 
         for x in 0..self.size.x {
             for y in 0..self.size.y {
                 let pair = Pair { x, y };
                 let cell = *self.get_cell(pair).unwrap();
-                let neighbor_value = self.get_neighbor_count(pair);
+
+                let neighbor_value = if let Mode::Adjacency = self.mode {
+                    self.get_neighbor_count(pair)
+                } else {
+                    self.get_visible_count(pair)
+                };
+
                 if cell == b'L' && neighbor_value == 0 {
                     // This seat becomes occupied
                     next.set_cell(pair, b'#');
-                } else if cell == b'#' && neighbor_value >= 4 {
+                } else if cell == b'#' && neighbor_value >= threshold {
                     // This seat becomes empty
                     next.set_cell(pair, b'L');
                 }
@@ -134,14 +228,29 @@ impl StateMachine {
 }
 
 fn main() {
-    let mut sm = StateMachine::from_file("input.txt").unwrap();
+    // Part 1
+    let mut sm = StateMachine::from_file("input.txt", Mode::Adjacency).unwrap();
 
     loop {
         let next = sm.next_state();
         if next == sm {
             println!(
-                "Found stable state {} with {} occupied seats",
-                sm,
+                "Found stable state with {} occupied seats",
+                sm.get_occupied_seats()
+            );
+            break;
+        }
+
+        sm = next;
+    }
+
+    let mut sm = StateMachine::from_file("input.txt", Mode::Visibility).unwrap();
+
+    loop {
+        let next = sm.next_state();
+        if next == sm {
+            println!(
+                "Found stable state with {} occupied seats",
                 sm.get_occupied_seats()
             );
             break;
@@ -157,7 +266,7 @@ mod tests {
 
     #[test]
     fn test_from_string() {
-        let sm = StateMachine::from_string("..L#\nLLLL\n");
+        let sm = StateMachine::from_string("..L#\nLLLL\n", Mode::Adjacency);
         assert!(sm.is_ok());
         let sm = sm.unwrap();
         assert_eq!(4, sm.size.x);
@@ -166,15 +275,15 @@ mod tests {
 
     #[test]
     fn test_eq() {
-        let sm = StateMachine::from_string("..L#\nLLLL\n").unwrap();
-        let other = StateMachine::from_string("..L#\nLLLL\n").unwrap();
+        let sm = StateMachine::from_string("..L#\nLLLL\n", Mode::Adjacency).unwrap();
+        let other = StateMachine::from_string("..L#\nLLLL\n", Mode::Adjacency).unwrap();
 
         assert_eq!(sm, other);
     }
 
     #[test]
     fn test_next_eq() {
-        let sm = StateMachine::from_string("....\n....\n").unwrap();
+        let sm = StateMachine::from_string("....\n....\n", Mode::Adjacency).unwrap();
         let next = sm.next_state();
 
         assert_eq!(sm, next);
@@ -195,6 +304,7 @@ LLLLLLLLLL
 L.LLLLLL.L
 L.LLLLL.LL
 ",
+            Mode::Adjacency,
         )
         .unwrap();
 
@@ -216,7 +326,8 @@ L.LLLLL.LL
 ##########
 #.######.#
 #.#####.##
-"
+",
+                Mode::Adjacency
             )
             .unwrap()
         );
@@ -229,6 +340,7 @@ L.LLLLL.LL
 L.LL.LL.LL
 LLLLLLL.LL
 ",
+            Mode::Adjacency,
         )
         .unwrap();
 
@@ -245,6 +357,7 @@ LLLLLLL.LL
 L.LL.LL.LL
 LLLLLLL.LL
 ",
+            Mode::Adjacency,
         )
         .unwrap();
         assert_eq!(b'L', *sm.get_cell(Pair { x: 0, y: 0 }).unwrap());
@@ -259,6 +372,7 @@ LLLLLLL.LL
 #.LL.LL.LL
 LLLLLLL.LL
 ",
+            Mode::Adjacency,
         )
         .unwrap();
 
@@ -281,6 +395,7 @@ LLLLLLL.LL
 #.######.#
 #.#####.##
 ",
+            Mode::Adjacency,
         )
         .unwrap();
         assert_eq!(2, sm.get_neighbor_count(Pair { x: 0, y: 0 }));
